@@ -13,12 +13,19 @@ from flask import Flask, render_template, request, send_file, session
 
 app = Flask(__name__)
 
+# Route Maintenance App
+@app.route('/')
+def home():
+    return render_template('mt.html')
+
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 
 TEMP_FOLDER = '/tmp'
 
+
 def generate_unique_id():
     return str(uuid.uuid4())
+
 
 def create_temp_directory():
     if 'temp_id' not in session:
@@ -27,18 +34,22 @@ def create_temp_directory():
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
 
+
 def delete_temp_directory(temp_id):
     temp_dir = get_temp_directory(temp_id)
     if os.path.exists(temp_dir):
         shutil.rmtree(temp_dir)
 
+
 def get_temp_directory(temp_id):
     return os.path.join(TEMP_FOLDER, temp_id)
+
 
 def check_cookies_valid_netflix(cookies):
     response = requests.get(
         netflix_url, cookies=cookies, allow_redirects=False)
     return "Active" if response.status_code == 200 else "Expired"
+
 
 def read_cookies(file):
     cookies = {}
@@ -60,6 +71,7 @@ def read_cookies(file):
                     cookies[name] = value
     return cookies
 
+
 def process_uploaded_file(file_path, temp_id):
     if file_path.endswith('.zip'):
         return extract_and_process_cookies_zip(file_path, temp_id)
@@ -67,6 +79,7 @@ def process_uploaded_file(file_path, temp_id):
         return extract_and_process_cookies_single(file_path, temp_id)
     else:
         return pd.DataFrame()
+
 
 def extract_and_process_cookies_zip(file_path, temp_id):
     result_df = pd.DataFrame(columns=['File Name', 'Cookies Status'])
@@ -90,6 +103,7 @@ def extract_and_process_cookies_zip(file_path, temp_id):
             result_df = pd.concat([result_df, temp_df], ignore_index=True)
     return result_df
 
+
 def extract_and_process_cookies_single(file_path, temp_id):
     file_name = os.path.basename(file_path)
     cookies = read_cookies(file_path)
@@ -98,11 +112,14 @@ def extract_and_process_cookies_single(file_path, temp_id):
         {'File Name': [file_name], 'Cookies Status': [cookies_status]})
     return result_df
 
-def delete_temp_directory_after_delay(temp_id, delay):
-    time.sleep(delay)
-    delete_temp_directory(temp_id)
 
-@app.route('/', methods=['GET', 'POST'])
+def delete_temp_directory_after_delay(temp_id, delay):
+    while True:
+        time.sleep(delay)
+        delete_temp_directory(temp_id)
+
+
+#@app.route('/', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
         if 'file' not in request.files:
@@ -119,6 +136,9 @@ def upload_file():
 
         create_temp_directory()
         temp_dir = get_temp_directory(session['temp_id'])
+        delete_temp_directory(session['temp_id'])
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
         file_path = os.path.join(temp_dir, file.filename)
         file.save(file_path)
 
@@ -127,6 +147,7 @@ def upload_file():
                          args=(session['temp_id'], delay)).start()
 
         if file.filename.endswith('.zip'):
+            loading()
             with zipfile.ZipFile(file_path, 'r') as zip_ref:
                 extracted_files = zip_ref.namelist()
 
@@ -187,6 +208,7 @@ def upload_file():
 
     return render_template('index.html', summary=None)
 
+
 @app.route('/download/<file_name>', methods=['GET'])
 def download_file(file_name):
     temp_dir = get_temp_directory(session['temp_id'])
@@ -196,9 +218,15 @@ def download_file(file_name):
     else:
         return render_template('404.html'), 404
 
+
 @app.errorhandler(404)
 def page_not_found(error):
     return render_template('404.html'), 404
+
+
+def loading():
+    pass
+
 
 if __name__ == '__main__':
     app.run(debug=False)
