@@ -15,7 +15,7 @@ app = Flask(__name__)
 
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 
-TEMP_FOLDER = '/tmp'
+TEMP_FOLDER = os.path.join(app.root_path, 'api', 'temp')
 
 def generate_unique_id():
     return str(uuid.uuid4())
