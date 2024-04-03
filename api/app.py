@@ -15,30 +15,30 @@ app = Flask(__name__)
 
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 
-TEMP_FILES = {}
-
+TEMP_FOLDER = '/tmp'
 
 def generate_unique_id():
     return str(uuid.uuid4())
 
-
 def create_temp_directory():
     if 'temp_id' not in session:
         session['temp_id'] = generate_unique_id()
-    if session['temp_id'] not in TEMP_FILES:
-        TEMP_FILES[session['temp_id']] = {}
-
+    temp_dir = get_temp_directory(session['temp_id'])
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
 
 def delete_temp_directory(temp_id):
-    if temp_id in TEMP_FILES:
-        del TEMP_FILES[temp_id]
+    temp_dir = get_temp_directory(temp_id)
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
 
+def get_temp_directory(temp_id):
+    return os.path.join(TEMP_FOLDER, temp_id)
 
 def check_cookies_valid_netflix(cookies):
     response = requests.get(
         netflix_url, cookies=cookies, allow_redirects=False)
     return "Active" if response.status_code == 200 else "Expired"
-
 
 def read_cookies(file):
     cookies = {}
@@ -60,7 +60,6 @@ def read_cookies(file):
                     cookies[name] = value
     return cookies
 
-
 def process_uploaded_file(file_path, temp_id):
     if file_path.endswith('.zip'):
         return extract_and_process_cookies_zip(file_path, temp_id)
@@ -69,14 +68,11 @@ def process_uploaded_file(file_path, temp_id):
     else:
         return pd.DataFrame()
 
-
 def extract_and_process_cookies_zip(file_path, temp_id):
     result_df = pd.DataFrame(columns=['File Name', 'Cookies Status'])
-    temp_files = TEMP_FILES[temp_id]
+    temp_folder = get_temp_directory(temp_id)
 
     with zipfile.ZipFile(file_path, 'r') as zip_ref:
-        temp_folder = os.path.join(
-            app.root_path, 'temp', session['temp_id'])
         zip_ref.extractall(temp_folder)
 
     extracted_files = [f for f in os.listdir(
@@ -94,7 +90,6 @@ def extract_and_process_cookies_zip(file_path, temp_id):
             result_df = pd.concat([result_df, temp_df], ignore_index=True)
     return result_df
 
-
 def extract_and_process_cookies_single(file_path, temp_id):
     file_name = os.path.basename(file_path)
     cookies = read_cookies(file_path)
@@ -103,11 +98,10 @@ def extract_and_process_cookies_single(file_path, temp_id):
         {'File Name': [file_name], 'Cookies Status': [cookies_status]})
     return result_df
 
-
 def delete_temp_directory_after_delay(temp_id, delay):
-    time.sleep(delay)
-    delete_temp_directory(temp_id)
-
+    while True:
+        time.sleep(delay)
+        delete_temp_directory(temp_id)
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
@@ -125,8 +119,8 @@ def upload_file():
             return render_template('index.html', error='Invalid file format!')
 
         create_temp_directory()
-        temp_dir = os.path.join(
-            app.root_path, 'temp', session['temp_id'])
+        temp_dir = get_temp_directory(session['temp_id'])
+        delete_temp_directory(session['temp_id'])
         if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
         file_path = os.path.join(temp_dir, file.filename)
@@ -198,26 +192,21 @@ def upload_file():
 
     return render_template('index.html', summary=None)
 
-
 @app.route('/download/<file_name>', methods=['GET'])
 def download_file(file_name):
-    temp_dir = os.path.join(
-        app.root_path, 'temp', session['temp_id'])
+    temp_dir = get_temp_directory(session['temp_id'])
     file_path = os.path.join(temp_dir, file_name)
     if os.path.exists(file_path):
         return send_file(file_path, as_attachment=True)
     else:
         return render_template('404.html'), 404
 
-
 @app.errorhandler(404)
 def page_not_found(error):
     return render_template('404.html'), 404
 
-
 def loading():
     pass
-
 
 if __name__ == '__main__':
     app.run(debug=False)
