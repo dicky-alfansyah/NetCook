@@ -20,6 +20,7 @@ TEMP_FOLDER = '/tmp'
 def generate_unique_id():
     return str(uuid.uuid4())
 
+
 def create_temp_directory():
     if 'temp_id' not in session:
         session['temp_id'] = generate_unique_id()
@@ -27,17 +28,22 @@ def create_temp_directory():
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
 
+
 def delete_temp_directory(temp_id):
     temp_dir = get_temp_directory(temp_id)
     if os.path.exists(temp_dir):
         shutil.rmtree(temp_dir)
 
+
 def get_temp_directory(temp_id):
     return os.path.join(TEMP_FOLDER, temp_id)
 
+
 def check_cookies_valid_netflix(cookies):
-    response = requests.get(netflix_url, cookies=cookies, allow_redirects=False)
+    response = requests.get(
+        netflix_url, cookies=cookies, allow_redirects=False)
     return "Active" if response.status_code == 200 else "Expired"
+
 
 def read_cookies(file):
     cookies = {}
@@ -59,6 +65,7 @@ def read_cookies(file):
                     cookies[name] = value
     return cookies
 
+
 def process_uploaded_file(file_path, temp_id):
     if file_path.endswith('.zip'):
         return extract_and_process_cookies_zip(file_path, temp_id)
@@ -67,6 +74,7 @@ def process_uploaded_file(file_path, temp_id):
     else:
         return pd.DataFrame()
 
+
 def extract_and_process_cookies_zip(file_path, temp_id):
     result_df = pd.DataFrame(columns=['File Name', 'Cookies Status'])
     temp_folder = get_temp_directory(temp_id)
@@ -74,7 +82,9 @@ def extract_and_process_cookies_zip(file_path, temp_id):
     with zipfile.ZipFile(file_path, 'r') as zip_ref:
         zip_ref.extractall(temp_folder)
 
-    extracted_files = [f for f in os.listdir(temp_folder) if os.path.isfile(os.path.join(temp_folder, f))]
+    extracted_files = [f for f in os.listdir(
+        temp_folder) if os.path.isfile(os.path.join(temp_folder, f))]
+
     extracted_files = extracted_files[:26]
 
     for file_name in extracted_files:
@@ -82,21 +92,26 @@ def extract_and_process_cookies_zip(file_path, temp_id):
             file_path = os.path.join(temp_folder, file_name)
             cookies = read_cookies(file_path)
             cookies_status = check_cookies_valid_netflix(cookies)
-            temp_df = pd.DataFrame({'File Name': [file_name], 'Cookies Status': [cookies_status]})
+            temp_df = pd.DataFrame(
+                {'File Name': [file_name], 'Cookies Status': [cookies_status]})
             result_df = pd.concat([result_df, temp_df], ignore_index=True)
     return result_df
+
 
 def extract_and_process_cookies_single(file_path, temp_id):
     file_name = os.path.basename(file_path)
     cookies = read_cookies(file_path)
     cookies_status = check_cookies_valid_netflix(cookies)
-    result_df = pd.DataFrame({'File Name': [file_name], 'Cookies Status': [cookies_status]})
+    result_df = pd.DataFrame(
+        {'File Name': [file_name], 'Cookies Status': [cookies_status]})
     return result_df
+
 
 def delete_temp_directory_after_delay(temp_id, delay):
     while True:
         time.sleep(delay)
         delete_temp_directory(temp_id)
+
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
@@ -122,7 +137,8 @@ def upload_file():
         file.save(file_path)
 
         delay = 3600
-        threading.Thread(target=delete_temp_directory_after_delay, args=(session['temp_id'], delay)).start()
+        threading.Thread(target=delete_temp_directory_after_delay,
+                         args=(session['temp_id'], delay)).start()
 
         if file.filename.endswith('.zip'):
             loading()
@@ -135,7 +151,8 @@ def upload_file():
             if any('/' in name for name in extracted_files):
                 return render_template('index.html', error='Files inside the zip archive must not be contained within a folder!')
 
-            invalid_files = [name for name in extracted_files if not (name.endswith('.txt') or name.endswith('.json'))]
+            invalid_files = [name for name in extracted_files if not (
+                name.endswith('.txt') or name.endswith('.json'))]
             if invalid_files:
                 return render_template('index.html', error=f'Zip files must contain only .txt and .json files!')
 
@@ -143,7 +160,8 @@ def upload_file():
             active_cookies_df = result_df[result_df['Cookies Status'] == 'Active']
 
             if not active_cookies_df.empty:
-                active_cookies_df = active_cookies_df.sort_values(by='Cookies Status')
+                active_cookies_df = active_cookies_df.sort_values(
+                    by='Cookies Status')
                 active_cookies = active_cookies_df.to_dict(orient='records')
 
                 total_files = len(result_df)
@@ -164,7 +182,8 @@ def upload_file():
             active_cookies_df = result_df[result_df['Cookies Status'] == 'Active']
 
             if not active_cookies_df.empty:
-                active_cookies_df = active_cookies_df.sort_values(by='Cookies Status')
+                active_cookies_df = active_cookies_df.sort_values(
+                    by='Cookies Status')
                 active_cookies = active_cookies_df.to_dict(orient='records')
 
                 total_files = len(result_df)
@@ -183,6 +202,7 @@ def upload_file():
 
     return render_template('index.html', summary=None)
 
+
 @app.route('/download/<file_name>', methods=['GET'])
 def download_file(file_name):
     temp_dir = get_temp_directory(session['temp_id'])
@@ -192,12 +212,15 @@ def download_file(file_name):
     else:
         return render_template('404.html'), 404
 
+
 @app.errorhandler(404)
 def page_not_found(error):
     return render_template('404.html'), 404
 
+
 def loading():
     pass
+
 
 if __name__ == '__main__':
     app.run(debug=False)
