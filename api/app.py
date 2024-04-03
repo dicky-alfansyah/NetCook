@@ -99,9 +99,8 @@ def extract_and_process_cookies_single(file_path, temp_id):
     return result_df
 
 def delete_temp_directory_after_delay(temp_id, delay):
-    while True:
-        time.sleep(delay)
-        delete_temp_directory(temp_id)
+    time.sleep(delay)
+    delete_temp_directory(temp_id)
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
@@ -120,9 +119,6 @@ def upload_file():
 
         create_temp_directory()
         temp_dir = get_temp_directory(session['temp_id'])
-        delete_temp_directory(session['temp_id'])
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
         file_path = os.path.join(temp_dir, file.filename)
         file.save(file_path)
 
@@ -131,7 +127,6 @@ def upload_file():
                          args=(session['temp_id'], delay)).start()
 
         if file.filename.endswith('.zip'):
-            loading()
             with zipfile.ZipFile(file_path, 'r') as zip_ref:
                 extracted_files = zip_ref.namelist()
 
@@ -204,9 +199,6 @@ def download_file(file_name):
 @app.errorhandler(404)
 def page_not_found(error):
     return render_template('404.html'), 404
-
-def loading():
-    pass
 
 if __name__ == '__main__':
     app.run(debug=False)
